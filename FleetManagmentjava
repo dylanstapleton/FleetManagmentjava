@@ -1,0 +1,204 @@
+import java.io.*;
+import java.util.*;
+
+/**
+ * Fleet Management System for tracking boats.
+ * This program allows managing a fleet of boats, including adding, removing,
+ * authorizing maintenance expenses, and printing the fleet's inventory.
+ * Fleet data can be initialized from a CSV file or loaded from a serialized database.
+ *
+ * @author Dylan Stapleton
+ * @version 1.0
+ * @see /* csc 120
+ */
+public class FleetManagement {
+    private static final String DB_FILE = "FleetData.db"; // Serialized database file name
+    private static ArrayList<Boat> fleet = new ArrayList<>(); // List to store fleet data
+
+    public static void main(String[] args) {
+        if (args.length > 0) {
+            loadFromCSV(args[0]);
+        } else {
+            loadFromSerialized();
+        }
+
+        menuLoop();
+        saveToSerialized();
+    }
+
+    private static void loadFromCSV(String filename) {
+        File file = new File(filename);
+        if (!file.exists()) {
+            System.out.println("Error: The file does not exist.");
+            return;
+        }
+
+        try (Scanner scanner = new Scanner(file)) {
+            while (scanner.hasNextLine()) {
+                String[] data = scanner.nextLine().split(",");
+                Boat.BoatType type = Boat.BoatType.valueOf(data[0].trim().toUpperCase());
+                String name = capitalizeName(data[1].trim());
+                int year = Integer.parseInt(data[2].trim());
+                String makeModel = data[3].trim();
+                double length = Double.parseDouble(data[4].trim());
+                double purchasePrice = Double.parseDouble(data[5].trim());
+
+                fleet.add(new Boat(type, name, year, makeModel, length, purchasePrice));
+            }
+            System.out.println("Fleet data loaded from CSV.");
+        } catch (Exception e) {
+            System.out.println("Error: Invalid data format in CSV.");
+        }
+    }
+
+    private static void loadFromSerialized() {
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(DB_FILE))) {
+            fleet = (ArrayList<Boat>) ois.readObject();
+            System.out.println("Fleet data loaded from database.");
+        } catch (FileNotFoundException e) {
+            System.out.println("No previous fleet data found. Starting fresh.");
+        } catch (Exception e) {
+            System.out.println("Error: Could not load fleet data.");
+        }
+    }
+
+    private static void saveToSerialized() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DB_FILE))) {
+            oos.writeObject(fleet);
+            System.out.println("Fleet data saved to database.");
+        } catch (IOException e) {
+            System.out.println("Error: Could not save fleet data.");
+        }
+    }
+
+    private static void menuLoop() {
+        Scanner input = new Scanner(System.in);
+        String choice;
+
+        System.out.println("Welcome to the Fleet Management System");
+        System.out.println("--------------------------------------");
+
+        do {
+            System.out.print("\n(P)rint, (A)dd, (R)emove, (E)xpense, e(X)it : ");
+            choice = input.nextLine().toUpperCase();
+
+            switch (choice) {
+                case "P":
+                    printInventory();
+                    break;
+                case "A":
+                    addBoat(input);
+                    break;
+                case "R":
+                    removeBoat(input);
+                    break;
+                case "E":
+                    requestSpending(input);
+                    break;
+                case "X":
+                    System.out.println("Exiting the Fleet Management System");
+                    break;
+                default:
+                    System.out.println("Invalid menu option, try again");
+            }
+        } while (!choice.equals("X"));
+    }
+
+    private static void printInventory() {
+        if (fleet.isEmpty()) {
+            System.out.println("No boats in the inventory.");
+            return;
+        }
+
+        System.out.println("\nFleet report:");
+        double totalPaid = 0.0;
+        double totalSpent = 0.0;
+
+        for (Boat boat : fleet) {
+            System.out.printf("    %-7s %-20s %-6d %-15s %-5.1f' : Paid $ %-9.2f : Spent $ %-9.2f\n",
+                    boat.getType(), capitalizeName(boat.getName()), boat.getYear(), boat.getMakeModel(),
+                    boat.getLength(), boat.getPurchasePrice(), boat.getMaintenanceExpenses());
+
+            totalPaid += boat.getPurchasePrice();
+            totalSpent += boat.getMaintenanceExpenses();
+        }
+
+        System.out.printf("    Total                                             : Paid $ %-9.2f : Spent $ %-9.2f\n",
+                totalPaid, totalSpent);
+    }
+
+    private static void addBoat(Scanner input) {
+        System.out.print("Please enter the new boat CSV data          : ");
+        String line = input.nextLine();
+
+        try {
+            String[] data = line.split(",");
+            Boat.BoatType type = Boat.BoatType.valueOf(data[0].trim().toUpperCase());
+            String name = capitalizeName(data[1].trim());
+            int year = Integer.parseInt(data[2].trim());
+            String makeModel = data[3].trim();
+            double length = Double.parseDouble(data[4].trim());
+            double purchasePrice = Double.parseDouble(data[5].trim());
+
+            fleet.add(new Boat(type, name, year, makeModel, length, purchasePrice));
+
+        } catch (Exception e) {
+            System.out.println("Error: Invalid input format.");
+        }
+    }
+
+    private static void removeBoat(Scanner input) {
+        System.out.print("Which boat do you want to remove?           : ");
+        String name = input.nextLine().trim();
+
+        boolean removed = fleet.removeIf(boat -> boat.getName().equalsIgnoreCase(name));
+
+        if (!removed) {
+            System.out.println("Cannot find boat " + name);
+        }
+    }
+
+    private static void requestSpending(Scanner input) {
+        System.out.print("Which boat do you want to spend on?         : ");
+        String name = input.nextLine().trim();
+
+        Boat boat = findBoatByName(name);
+
+        if (boat != null) {
+            System.out.print("How much do you want to spend?              : ");
+            double amount = input.nextDouble();
+            input.nextLine();
+
+            double remainingFunds = boat.getPurchasePrice() - boat.getMaintenanceExpenses();
+
+            if (amount <= remainingFunds) {
+                boat.addMaintenanceExpense(amount);
+                System.out.printf("Expense authorized, $%.2f spent.\n", amount);
+            } else {
+                System.out.printf("Expense not permitted, only $%.2f left to spend.\n", remainingFunds);
+            }
+        } else {
+            System.out.println("Cannot find boat " + name);
+        }
+    }
+
+    private static Boat findBoatByName(String name) {
+        for (Boat boat : fleet) {
+            if (boat.getName().equalsIgnoreCase(name)) {
+                return boat;
+            }
+        }
+        return null;
+    }
+
+    private static String capitalizeName(String name) {
+        String[] words = name.split(" ");
+        StringBuilder capitalized = new StringBuilder();
+        for (String word : words) {
+            capitalized.append(word.substring(0, 1).toUpperCase())
+                    .append(word.substring(1).toLowerCase())
+                    .append(" ");
+        }
+        return capitalized.toString().trim();
+    }
+}
