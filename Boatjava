@@ -1,0 +1,43 @@
+import java.io.Serializable;
+
+class Boat implements Serializable {
+    public enum BoatType { SAILING, POWER }
+
+    private BoatType type;
+    private String name;
+    private int year;
+    private String makeModel;
+    private double length;
+    private double purchasePrice;
+    private double maintenanceExpenses;
+
+    public Boat(BoatType type, String name, int year, String makeModel, double length, double purchasePrice) {
+        this.type = type;
+        this.name = name.toLowerCase(); // Normalize for case-insensitive comparisons
+        this.year = year;
+        this.makeModel = makeModel;
+        this.length = length;
+        this.purchasePrice = purchasePrice;
+        this.maintenanceExpenses = 0.0;
+    }
+
+    public BoatType getType() { return type; }
+    public String getName() { return name; }
+    public int getYear() { return year; }
+    public String getMakeModel() { return makeModel; }
+    public double getLength() { return length; }
+    public double getPurchasePrice() { return purchasePrice; }
+    public double getMaintenanceExpenses() { return maintenanceExpenses; }
+
+    public void addMaintenanceExpense(double amount) {
+        maintenanceExpenses += amount;
+    }
+
+    @Override
+    public String toString() {
+        return String.format(
+                "%-8s %-20s %4d %-15s %3.0f' : Paid $ %-9.2f : Spent $ %-9.2f",
+                type, name, year, makeModel, length, purchasePrice, maintenanceExpenses
+        );
+    }
+}
